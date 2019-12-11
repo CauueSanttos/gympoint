@@ -41,6 +41,23 @@ class EnrollmentController {
       return res.status(400).json({ error: 'Student not exists!' });
     }
 
+    /**
+     * Check if exists the enrollment to student
+     */
+    const enrollmentExist = await Enrollment.findOne({
+      where: {
+        student_id: req.body.student_id
+      }
+    });
+
+    if (enrollmentExist) {
+      const { end_date } = enrollmentExist;
+
+      if (!isBefore(parseISO(end_date), new Date())) {
+        return res.status(400).json({ error: 'The student has a enrollment active' });
+      }
+    }
+
     enrollment.start_date = parseISO(enrollment.start_date);
 
     /**
