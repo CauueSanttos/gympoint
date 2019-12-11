@@ -5,6 +5,9 @@ import Plan from '../models/Plan';
 import Student from '../models/Student';
 import Enrollment from '../models/Enrollment';
 
+import CreateEnrollment from '../jobs/CreateEnrollment';
+import Queue from '../../lib/Queue';
+
 class EnrollmentController {
   async index(req, res) {
     const enrollments = await Enrollment.findAll();
@@ -37,7 +40,9 @@ class EnrollmentController {
     /**
      * Search data of chosen student
      */
-    if (!(await Student.findByPk(enrollment.student_id))) {
+    const student = await Student.findByPk(enrollment.student_id);
+
+    if (!student) {
       return res.status(400).json({ error: 'Student not exists!' });
     }
 
@@ -46,15 +51,17 @@ class EnrollmentController {
      */
     const enrollmentExist = await Enrollment.findOne({
       where: {
-        student_id: req.body.student_id
-      }
+        student_id: req.body.student_id,
+      },
     });
 
     if (enrollmentExist) {
       const { end_date } = enrollmentExist;
 
       if (!isBefore(parseISO(end_date), new Date())) {
-        return res.status(400).json({ error: 'The student has a enrollment active' });
+        return res
+          .status(400)
+          .json({ error: 'The student has a enrollment active' });
       }
     }
 
@@ -70,7 +77,19 @@ class EnrollmentController {
     enrollment.price = plan.getTotalPrice();
     enrollment.end_date = addMonths(enrollment.start_date, plan.duration);
 
-    return res.json(await Enrollment.create(enrollment));
+    const enrollmentCreate = await Enrollment.create(enrollment);
+
+    /**
+     * Send email to student
+     */
+
+    await Queue.add(CreateEnrollment.key, {
+      enrollment: enrollmentCreate,
+      student,
+      plan,
+    });
+
+    return res.json(enrollmentCreate);
   }
 
   async update(req, res) {
@@ -129,7 +148,9 @@ class EnrollmentController {
 
     enrollment.destroy();
 
-    return res.status(200).json({ success: 'Enrollment deleted with success!' });
+    return res
+      .status(200)
+      .json({ success: 'Enrollment deleted with success!' });
   }
 }
 
