@@ -8,7 +8,7 @@ class CheckinController {
   async index(req, res) {
     const { student_id } = req.params;
 
-    if (!(await Student.findAll({ student_id }))) {
+    if (!(await Student.findByPk(student_id))) {
       return res.status(400).json({ error: 'The student does not exists!' });
     }
 
